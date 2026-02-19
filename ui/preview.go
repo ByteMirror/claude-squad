@@ -87,11 +87,11 @@ func (p *PreviewPane) UpdateContent(instance *session.Instance) error {
 			"",
 			lipgloss.NewStyle().
 				Bold(true).
-				Foreground(lipgloss.Color("#7D56F4")).
+				Foreground(lipgloss.Color("#D94040")).
 				Render("Starting instance"),
 			"",
 			lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#7D56F4")).
+				Foreground(lipgloss.Color("#D94040")).
 				Render(bar),
 			"",
 			lipgloss.NewStyle().

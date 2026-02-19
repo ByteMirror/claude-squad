@@ -1,31 +1,31 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
-  --accent-color: #4a55af;
-  --accent-light: #7983d8;
+  --accent-color: #af4a4a;
+  --accent-light: #d87979;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --background: #0a0a0a;
     --foreground: #ededed;
-    --accent-color: #6e79d8;
-    --accent-light: #9098e9;
+    --accent-color: #d86e6e;
+    --accent-light: #e99090;
   }
 }
 
 html[data-theme="light"] {
   --background: #ffffff;
   --foreground: #171717;
-  --accent-color: #4a55af;
-  --accent-light: #7983d8;
+  --accent-color: #af4a4a;
+  --accent-light: #d87979;
 }
 
 html[data-theme="dark"] {
   --background: #0a0a0a;
   --foreground: #ededed;
-  --accent-color: #6e79d8;
-  --accent-light: #9098e9;
+  --accent-color: #d86e6e;
+  --accent-light: #e99090;
 }
 
 html,

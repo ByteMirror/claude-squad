@@ -24,13 +24,13 @@ var sepStyle = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{
 	Dark:  "#3C3C3C",
 })
 
-var actionGroupStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("99"))
+var actionGroupStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("203"))
 
 var separator = " • "
 var verticalSeparator = " │ "
 
 var menuStyle = lipgloss.NewStyle().
-	Foreground(lipgloss.Color("205"))
+	Foreground(lipgloss.Color("196"))
 
 // MenuState represents different states the menu can be in
 type MenuState int

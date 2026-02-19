@@ -37,12 +37,12 @@ var listDescStyle = lipgloss.NewStyle().
 
 var selectedTitleStyle = lipgloss.NewStyle().
 	Padding(1, 1, 0, 1).
-	Background(lipgloss.Color("#dde4f0")).
+	Background(lipgloss.Color("#f0dddd")).
 	Foreground(lipgloss.AdaptiveColor{Light: "#1a1a1a", Dark: "#1a1a1a"})
 
 var selectedDescStyle = lipgloss.NewStyle().
 	Padding(0, 1, 1, 1).
-	Background(lipgloss.Color("#dde4f0")).
+	Background(lipgloss.Color("#f0dddd")).
 	Foreground(lipgloss.AdaptiveColor{Light: "#1a1a1a", Dark: "#1a1a1a"})
 
 // Active (unfocused) styles — muted version of selected
@@ -57,11 +57,11 @@ var activeDescStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.AdaptiveColor{Light: "#ffffff", Dark: "#1a1a1a"})
 
 var mainTitle = lipgloss.NewStyle().
-	Background(lipgloss.Color("62")).
+	Background(lipgloss.Color("160")).
 	Foreground(lipgloss.Color("230"))
 
 var autoYesStyle = lipgloss.NewStyle().
-	Background(lipgloss.Color("#dde4f0")).
+	Background(lipgloss.Color("#f0dddd")).
 	Foreground(lipgloss.Color("#1a1a1a"))
 
 type List struct {

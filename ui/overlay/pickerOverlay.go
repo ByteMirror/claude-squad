@@ -9,12 +9,12 @@ import (
 
 var pickerBorderStyle = lipgloss.NewStyle().
 	Border(lipgloss.RoundedBorder()).
-	BorderForeground(lipgloss.Color("#7D56F4")).
+	BorderForeground(lipgloss.Color("#D94040")).
 	Padding(1, 2)
 
 var pickerTitleStyle = lipgloss.NewStyle().
 	Bold(true).
-	Foreground(lipgloss.Color("#7D56F4")).
+	Foreground(lipgloss.Color("#D94040")).
 	MarginBottom(1)
 
 var pickerSearchStyle = lipgloss.NewStyle().
@@ -25,7 +25,7 @@ var pickerSearchStyle = lipgloss.NewStyle().
 
 var pickerSearchActiveStyle = lipgloss.NewStyle().
 	Border(lipgloss.RoundedBorder()).
-	BorderForeground(lipgloss.Color("#7D56F4")).
+	BorderForeground(lipgloss.Color("#D94040")).
 	Padding(0, 1).
 	MarginBottom(1)
 
@@ -35,7 +35,7 @@ var pickerItemStyle = lipgloss.NewStyle().
 
 var pickerSelectedItemStyle = lipgloss.NewStyle().
 	Padding(0, 1).
-	Background(lipgloss.Color("#7D56F4")).
+	Background(lipgloss.Color("#D94040")).
 	Foreground(lipgloss.Color("#ffffff"))
 
 var pickerHintStyle = lipgloss.NewStyle().

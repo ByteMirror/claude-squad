@@ -9,8 +9,8 @@ import (
 
 var contextMenuStyle = lipgloss.NewStyle().
 	Border(lipgloss.RoundedBorder()).
-	BorderForeground(lipgloss.Color("#7D56F4")).
-	Background(lipgloss.Color("#1a1a2e")).
+	BorderForeground(lipgloss.Color("#D94040")).
+	Background(lipgloss.Color("#2e1a1a")).
 	Padding(0, 1)
 
 var contextItemStyle = lipgloss.NewStyle().
@@ -19,7 +19,7 @@ var contextItemStyle = lipgloss.NewStyle().
 
 var contextSelectedStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.Color("#1a1a1a")).
-	Background(lipgloss.Color("#7D56F4")).
+	Background(lipgloss.Color("#D94040")).
 	Padding(0, 1)
 
 var contextDisabledStyle = lipgloss.NewStyle().

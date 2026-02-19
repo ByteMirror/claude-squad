@@ -17,7 +17,7 @@ func tabBorderWithBottom(left, middle, right string) lipgloss.Border {
 var (
 	inactiveTabBorder = tabBorderWithBottom("┴", "─", "┴")
 	activeTabBorder   = tabBorderWithBottom("┘", " ", "└")
-	highlightColor    = lipgloss.AdaptiveColor{Light: "#874BFD", Dark: "#7D56F4"}
+	highlightColor    = lipgloss.AdaptiveColor{Light: "#E04545", Dark: "#D94040"}
 	inactiveTabStyle  = lipgloss.NewStyle().
 				Border(inactiveTabBorder, true).
 				BorderForeground(highlightColor).

@@ -121,11 +121,11 @@ func (t *TextInputOverlay) Render() string {
 	// Create styles
 	style := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("62")).
+		BorderForeground(lipgloss.Color("160")).
 		Padding(1, 2)
 
 	titleStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("62")).
+		Foreground(lipgloss.Color("160")).
 		Bold(true).
 		MarginBottom(1)
 
@@ -134,7 +134,7 @@ func (t *TextInputOverlay) Render() string {
 
 	focusedButtonStyle := buttonStyle
 	focusedButtonStyle = focusedButtonStyle.
-		Background(lipgloss.Color("62")).
+		Background(lipgloss.Color("160")).
 		Foreground(lipgloss.Color("0"))
 
 	// Set textarea width to fit within the overlay

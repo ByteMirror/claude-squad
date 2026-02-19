@@ -8,7 +8,7 @@ import (
 )
 
 var sidebarTitleStyle = lipgloss.NewStyle().
-	Background(lipgloss.Color("62")).
+	Background(lipgloss.Color("160")).
 	Foreground(lipgloss.Color("230"))
 
 // sidebarBorderStyle wraps the entire sidebar content in a subtle rounded border
@@ -39,12 +39,12 @@ var sectionHeaderStyle = lipgloss.NewStyle().
 
 var searchBarStyle = lipgloss.NewStyle().
 	Border(lipgloss.RoundedBorder()).
-	BorderForeground(lipgloss.Color("62")).
+	BorderForeground(lipgloss.Color("160")).
 	Padding(0, 1)
 
 var searchActiveBarStyle = lipgloss.NewStyle().
 	Border(lipgloss.RoundedBorder()).
-	BorderForeground(lipgloss.Color("205")).
+	BorderForeground(lipgloss.Color("196")).
 	Padding(0, 1)
 
 const (
