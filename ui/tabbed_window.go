@@ -17,7 +17,7 @@ func tabBorderWithBottom(left, middle, right string) lipgloss.Border {
 var (
 	inactiveTabBorder = tabBorderWithBottom("┴", "─", "┴")
 	activeTabBorder   = tabBorderWithBottom("┘", " ", "└")
-	highlightColor    = lipgloss.AdaptiveColor{Light: "#874BFD", Dark: "#7D56F4"}
+	highlightColor    = lipgloss.AdaptiveColor{Light: "#E04545", Dark: "#D94040"}
 	inactiveTabStyle  = lipgloss.NewStyle().
 				Border(inactiveTabBorder, true).
 				BorderForeground(highlightColor).
@@ -25,9 +25,16 @@ var (
 	activeTabStyle = inactiveTabStyle.
 			Border(activeTabBorder, true).
 			AlignHorizontal(lipgloss.Center)
+	windowBorder = func() lipgloss.Border {
+		b := lipgloss.RoundedBorder()
+		// Top corners don't matter (top border is disabled), but set bottom corners rounded
+		b.BottomLeft = "╰"
+		b.BottomRight = "╯"
+		return b
+	}()
 	windowStyle = lipgloss.NewStyle().
 			BorderForeground(highlightColor).
-			Border(lipgloss.NormalBorder(), false, true, true, true)
+			Border(windowBorder, false, true, true, true)
 )
 
 const (
@@ -71,7 +78,7 @@ func (w *TabbedWindow) SetInstance(instance *session.Instance) {
 
 // AdjustPreviewWidth adjusts the width of the preview pane to be 90% of the provided width.
 func AdjustPreviewWidth(width int) int {
-	return int(float64(width) * 0.9)
+	return width - 2 // just enough margin for borders
 }
 
 func (w *TabbedWindow) SetSize(width, height int) {

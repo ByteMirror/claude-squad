@@ -19,6 +19,7 @@ type PreviewPane struct {
 	previewState previewState
 	isScrolling  bool
 	viewport     viewport.Model
+	loadingTick  int // animation counter for loading state
 }
 
 type previewState struct {
@@ -54,6 +55,52 @@ func (p *PreviewPane) UpdateContent(instance *session.Instance) error {
 	switch {
 	case instance == nil:
 		p.setFallbackState("No agents running yet. Spin up a new instance with 'n' to get started!")
+		return nil
+	case instance.Status == session.Loading:
+		// Real progress from instance startup stages
+		stage := instance.LoadingStage
+		total := instance.LoadingTotal
+		if total == 0 {
+			total = 7
+		}
+
+		// Progress bar based on actual stage
+		barWidth := 20
+		filled := (stage * barWidth) / total
+		if filled > barWidth {
+			filled = barWidth
+		}
+		bar := strings.Repeat("█", filled) + strings.Repeat("░", barWidth-filled)
+
+		stepText := instance.LoadingMessage
+		if stepText == "" {
+			stepText = "Starting..."
+		}
+
+		pct := 0
+		if total > 0 {
+			pct = (stage * 100) / total
+		}
+		progressText := fmt.Sprintf("%d%%", pct)
+
+		p.setFallbackState(lipgloss.JoinVertical(lipgloss.Center,
+			"",
+			lipgloss.NewStyle().
+				Bold(true).
+				Foreground(lipgloss.Color("#D94040")).
+				Render("Starting instance"),
+			"",
+			lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#D94040")).
+				Render(bar),
+			"",
+			lipgloss.NewStyle().
+				Foreground(lipgloss.AdaptiveColor{Light: "#808080", Dark: "#808080"}).
+				Render(stepText),
+			lipgloss.NewStyle().
+				Foreground(lipgloss.AdaptiveColor{Light: "#aaaaaa", Dark: "#555555"}).
+				Render(progressText),
+		))
 		return nil
 	case instance.Status == session.Paused:
 		p.setFallbackState(lipgloss.JoinVertical(lipgloss.Center,

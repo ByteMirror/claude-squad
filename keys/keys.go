@@ -23,7 +23,14 @@ const (
 	KeyCheckout
 	KeyResume
 	KeyPrompt // New key for entering a prompt
-	KeyHelp   // Key for showing help screen
+	KeyHelp              // Key for showing help screen
+	KeyNewSkipPermissions // Key for creating instance with --dangerously-skip-permissions
+
+	KeyNewTopic           // Key for creating a new topic
+	KeyMoveTo             // Key for moving instance to a topic
+	KeySearch             // Key for activating search
+	KeyLeft               // Key for switching focus left (to sidebar)
+	KeyRight              // Key for switching focus right (to instance list)
 
 	// Diff keybindings
 	KeyShiftUp
@@ -49,6 +56,14 @@ var GlobalKeyStringsMap = map[string]KeyName{
 	"r":          KeyResume,
 	"p":          KeySubmit,
 	"?":          KeyHelp,
+	"S":          KeyNewSkipPermissions,
+	"T":     KeyNewTopic,
+	"m":     KeyMoveTo,
+	"/":     KeySearch,
+	"left":  KeyLeft,
+	"h":     KeyLeft,
+	"right": KeyRight,
+	"l":     KeyRight,
 }
 
 // GlobalkeyBindings is a global, immutable map of KeyName tot keybinding.
@@ -108,6 +123,30 @@ var GlobalkeyBindings = map[KeyName]key.Binding{
 	KeyResume: key.NewBinding(
 		key.WithKeys("r"),
 		key.WithHelp("r", "resume"),
+	),
+	KeyNewSkipPermissions: key.NewBinding(
+		key.WithKeys("S"),
+		key.WithHelp("S", "new (skip permissions)"),
+	),
+	KeyNewTopic: key.NewBinding(
+		key.WithKeys("T"),
+		key.WithHelp("T", "new topic"),
+	),
+	KeyMoveTo: key.NewBinding(
+		key.WithKeys("m"),
+		key.WithHelp("m", "move to topic"),
+	),
+	KeySearch: key.NewBinding(
+		key.WithKeys("/"),
+		key.WithHelp("/", "search"),
+	),
+	KeyLeft: key.NewBinding(
+		key.WithKeys("left", "h"),
+		key.WithHelp("←/h", "sidebar"),
+	),
+	KeyRight: key.NewBinding(
+		key.WithKeys("right", "l"),
+		key.WithHelp("→/l", "instances"),
 	),
 
 	// -- Special keybindings --

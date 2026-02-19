@@ -82,15 +82,12 @@ func (t *TextInputOverlay) HandleKeyPress(msg tea.KeyMsg) bool {
 		t.Canceled = true
 		return true
 	case tea.KeyEnter:
-		if t.FocusIndex == 1 {
-			// Enter button is focused, so submit.
-			t.Submitted = true
-			if t.OnSubmit != nil {
-				t.OnSubmit()
-			}
-			return true
+		// Enter always submits
+		t.Submitted = true
+		if t.OnSubmit != nil {
+			t.OnSubmit()
 		}
-		fallthrough // Send enter key to textarea
+		return true
 	default:
 		if t.FocusIndex == 0 {
 			t.textarea, _ = t.textarea.Update(msg)
@@ -124,11 +121,11 @@ func (t *TextInputOverlay) Render() string {
 	// Create styles
 	style := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("62")).
+		BorderForeground(lipgloss.Color("160")).
 		Padding(1, 2)
 
 	titleStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("62")).
+		Foreground(lipgloss.Color("160")).
 		Bold(true).
 		MarginBottom(1)
 
@@ -137,11 +134,15 @@ func (t *TextInputOverlay) Render() string {
 
 	focusedButtonStyle := buttonStyle
 	focusedButtonStyle = focusedButtonStyle.
-		Background(lipgloss.Color("62")).
+		Background(lipgloss.Color("160")).
 		Foreground(lipgloss.Color("0"))
 
 	// Set textarea width to fit within the overlay
-	t.textarea.SetWidth(t.width - 6) // Account for padding and borders
+	w := t.width
+	if w < 40 {
+		w = 40
+	}
+	t.textarea.SetWidth(w - 6) // Account for padding and borders
 
 	// Build the view
 	content := titleStyle.Render(t.Title) + "\n"

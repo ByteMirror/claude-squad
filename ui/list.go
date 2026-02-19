@@ -37,20 +37,31 @@ var listDescStyle = lipgloss.NewStyle().
 
 var selectedTitleStyle = lipgloss.NewStyle().
 	Padding(1, 1, 0, 1).
-	Background(lipgloss.Color("#dde4f0")).
+	Background(lipgloss.Color("#f0dddd")).
 	Foreground(lipgloss.AdaptiveColor{Light: "#1a1a1a", Dark: "#1a1a1a"})
 
 var selectedDescStyle = lipgloss.NewStyle().
 	Padding(0, 1, 1, 1).
-	Background(lipgloss.Color("#dde4f0")).
+	Background(lipgloss.Color("#f0dddd")).
 	Foreground(lipgloss.AdaptiveColor{Light: "#1a1a1a", Dark: "#1a1a1a"})
 
+// Active (unfocused) styles — muted version of selected
+var activeTitleStyle = lipgloss.NewStyle().
+	Padding(1, 1, 0, 1).
+	Background(lipgloss.AdaptiveColor{Light: "#b0b0b0", Dark: "#666666"}).
+	Foreground(lipgloss.AdaptiveColor{Light: "#ffffff", Dark: "#1a1a1a"})
+
+var activeDescStyle = lipgloss.NewStyle().
+	Padding(0, 1, 1, 1).
+	Background(lipgloss.AdaptiveColor{Light: "#b0b0b0", Dark: "#666666"}).
+	Foreground(lipgloss.AdaptiveColor{Light: "#ffffff", Dark: "#1a1a1a"})
+
 var mainTitle = lipgloss.NewStyle().
-	Background(lipgloss.Color("62")).
+	Background(lipgloss.Color("160")).
 	Foreground(lipgloss.Color("230"))
 
 var autoYesStyle = lipgloss.NewStyle().
-	Background(lipgloss.Color("#dde4f0")).
+	Background(lipgloss.Color("#f0dddd")).
 	Foreground(lipgloss.Color("#1a1a1a"))
 
 type List struct {
@@ -59,10 +70,14 @@ type List struct {
 	height, width int
 	renderer      *InstanceRenderer
 	autoyes       bool
+	focused       bool
 
 	// map of repo name to number of instances using it. Used to display the repo name only if there are
 	// multiple repos in play.
 	repos map[string]int
+
+	filter   string // topic name filter (empty = show all)
+	allItems []*session.Instance
 }
 
 func NewList(spinner *spinner.Model, autoYes bool) *List {
@@ -71,7 +86,12 @@ func NewList(spinner *spinner.Model, autoYes bool) *List {
 		renderer: &InstanceRenderer{spinner: spinner},
 		repos:    make(map[string]int),
 		autoyes:  autoYes,
+		focused:  true,
 	}
+}
+
+func (l *List) SetFocused(focused bool) {
+	l.focused = focused
 }
 
 // SetSize sets the height and width of the list.
@@ -84,7 +104,7 @@ func (l *List) SetSize(width, height int) {
 // SetSessionPreviewSize sets the height and width for the tmux sessions. This makes the stdout line have the correct
 // width and height.
 func (l *List) SetSessionPreviewSize(width, height int) (err error) {
-	for i, item := range l.items {
+	for i, item := range l.allItems {
 		if !item.Started() || item.Paused() {
 			continue
 		}
@@ -114,14 +134,18 @@ func (r *InstanceRenderer) setWidth(width int) {
 // ɹ and ɻ are other options.
 const branchIcon = "Ꮧ"
 
-func (r *InstanceRenderer) Render(i *session.Instance, idx int, selected bool, hasMultipleRepos bool) string {
+func (r *InstanceRenderer) Render(i *session.Instance, idx int, selected bool, focused bool, hasMultipleRepos bool) string {
 	prefix := fmt.Sprintf(" %d. ", idx)
 	if idx >= 10 {
 		prefix = prefix[:len(prefix)-1]
 	}
 	titleS := selectedTitleStyle
 	descS := selectedDescStyle
-	if !selected {
+	if selected && !focused {
+		// Active but unfocused — muted highlight
+		titleS = activeTitleStyle
+		descS = activeDescStyle
+	} else if !selected {
 		titleS = titleStyle
 		descS = listDescStyle
 	}
@@ -129,7 +153,7 @@ func (r *InstanceRenderer) Render(i *session.Instance, idx int, selected bool, h
 	// add spinner next to title if it's running
 	var join string
 	switch i.Status {
-	case session.Running:
+	case session.Running, session.Loading:
 		join = fmt.Sprintf("%s ", r.spinner.View())
 	case session.Ready:
 		join = readyStyle.Render(readyIcon)
@@ -144,12 +168,23 @@ func (r *InstanceRenderer) Render(i *session.Instance, idx int, selected bool, h
 	if widthAvail > 0 && runewidth.StringWidth(titleText) > widthAvail {
 		titleText = runewidth.Truncate(titleText, widthAvail-3, "...")
 	}
-	title := titleS.Render(lipgloss.JoinHorizontal(
-		lipgloss.Left,
-		lipgloss.Place(r.width-3, 1, lipgloss.Left, lipgloss.Center, fmt.Sprintf("%s %s", prefix, titleText)),
-		" ",
-		join,
-	))
+
+	// Add skip-permissions indicator
+	skipPermsIndicator := ""
+	if i.SkipPermissions {
+		skipPermsIndicator = " ⚡"
+	}
+
+	titleContent := fmt.Sprintf("%s %s%s", prefix, titleText, skipPermsIndicator)
+	// Build title line: content + spaces + status icon, all fitting within r.width
+	titleContentWidth := runewidth.StringWidth(titleContent)
+	joinWidth := runewidth.StringWidth(join)
+	titlePad := r.width - titleContentWidth - joinWidth - 2 // 2 for left/right padding in style
+	if titlePad < 1 {
+		titlePad = 1
+	}
+	titleLine := titleContent + strings.Repeat(" ", titlePad) + join
+	title := titleS.Width(r.width).Render(titleLine)
 
 	stat := i.GetDiffStats()
 
@@ -214,11 +249,11 @@ func (r *InstanceRenderer) Render(i *session.Instance, idx int, selected bool, h
 
 	branchLine := fmt.Sprintf("%s %s-%s%s%s", strings.Repeat(" ", len(prefix)), branchIcon, branch, spaces, diff)
 
-	// join title and subtitle
+	// join title and subtitle — use same width for uniform background
 	text := lipgloss.JoinVertical(
 		lipgloss.Left,
 		title,
-		descS.Render(branchLine),
+		descS.Width(r.width).Render(branchLine),
 	)
 
 	return text
@@ -253,7 +288,7 @@ func (l *List) String() string {
 
 	// Render the list.
 	for i, item := range l.items {
-		b.WriteString(l.renderer.Render(item, i+1, i == l.selectedIdx, len(l.repos) > 1))
+		b.WriteString(l.renderer.Render(item, i+1, i == l.selectedIdx, l.focused, len(l.repos) > 1))
 		if i != len(l.items)-1 {
 			b.WriteString("\n\n")
 		}
@@ -271,7 +306,7 @@ func (l *List) Down() {
 	}
 }
 
-// Kill selects the next item in the list.
+// Kill removes and kills the currently selected instance.
 func (l *List) Kill() {
 	if len(l.items) == 0 {
 		return
@@ -296,8 +331,14 @@ func (l *List) Kill() {
 		l.rmRepo(repoName)
 	}
 
-	// Since there's items after this, the selectedIdx can stay the same.
+	// Remove from both items and allItems
 	l.items = append(l.items[:l.selectedIdx], l.items[l.selectedIdx+1:]...)
+	for i, inst := range l.allItems {
+		if inst == targetInstance {
+			l.allItems = append(l.allItems[:i], l.allItems[i+1:]...)
+			break
+		}
+	}
 }
 
 func (l *List) Attach() (chan struct{}, error) {
@@ -337,7 +378,8 @@ func (l *List) rmRepo(repo string) {
 // is started. If the instance was restored from storage or is paused, you can call the finalizer immediately.
 // When creating a new one and entering the name, you want to call the finalizer once the name is done.
 func (l *List) AddInstance(instance *session.Instance) (finalize func()) {
-	l.items = append(l.items, instance)
+	l.allItems = append(l.allItems, instance)
+	l.rebuildFilteredItems()
 	// The finalizer registers the repo name once the instance is started.
 	return func() {
 		repoName, err := instance.RepoName()
@@ -366,7 +408,83 @@ func (l *List) SetSelectedInstance(idx int) {
 	l.selectedIdx = idx
 }
 
-// GetInstances returns all instances in the list
+// GetInstances returns all instances (unfiltered) for persistence and metadata updates.
 func (l *List) GetInstances() []*session.Instance {
-	return l.items
+	return l.allItems
+}
+
+// TotalInstances returns the total number of instances regardless of filter.
+func (l *List) TotalInstances() int {
+	return len(l.allItems)
+}
+
+// SetFilter filters the displayed instances by topic name.
+// Empty string shows all. SidebarUngrouped shows only ungrouped instances.
+func (l *List) SetFilter(topicFilter string) {
+	l.filter = topicFilter
+	l.rebuildFilteredItems()
+}
+
+// SetSearchFilter filters instances by search query across all topics.
+// SetSearchFilter filters instances by search query across all topics.
+func (l *List) SetSearchFilter(query string) {
+	l.SetSearchFilterWithTopic(query, "")
+}
+
+// SetSearchFilterWithTopic filters instances by search query, optionally scoped to a topic.
+// topicFilter: "" = all topics, "__ungrouped__" = ungrouped only, otherwise = specific topic.
+func (l *List) SetSearchFilterWithTopic(query string, topicFilter string) {
+	l.filter = ""
+	filtered := make([]*session.Instance, 0)
+	for _, inst := range l.allItems {
+		// Check topic filter first
+		if topicFilter != "" {
+			if topicFilter == "__ungrouped__" && inst.TopicName != "" {
+				continue
+			} else if topicFilter != "__ungrouped__" && inst.TopicName != topicFilter {
+				continue
+			}
+		}
+		// Then check search query
+		if query == "" ||
+			strings.Contains(strings.ToLower(inst.Title), query) ||
+			strings.Contains(strings.ToLower(inst.TopicName), query) {
+			filtered = append(filtered, inst)
+		}
+	}
+	l.items = filtered
+	if l.selectedIdx >= len(l.items) {
+		l.selectedIdx = len(l.items) - 1
+	}
+	if l.selectedIdx < 0 {
+		l.selectedIdx = 0
+	}
+}
+
+func (l *List) rebuildFilteredItems() {
+	if l.filter == "" {
+		l.items = l.allItems
+	} else if l.filter == SidebarUngrouped {
+		filtered := make([]*session.Instance, 0)
+		for _, inst := range l.allItems {
+			if inst.TopicName == "" {
+				filtered = append(filtered, inst)
+			}
+		}
+		l.items = filtered
+	} else {
+		filtered := make([]*session.Instance, 0)
+		for _, inst := range l.allItems {
+			if inst.TopicName == l.filter {
+				filtered = append(filtered, inst)
+			}
+		}
+		l.items = filtered
+	}
+	if l.selectedIdx >= len(l.items) {
+		l.selectedIdx = len(l.items) - 1
+	}
+	if l.selectedIdx < 0 {
+		l.selectedIdx = 0
+	}
 }

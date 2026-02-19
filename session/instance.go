@@ -49,8 +49,21 @@ type Instance struct {
 	UpdatedAt time.Time
 	// AutoYes is true if the instance should automatically press enter when prompted.
 	AutoYes bool
+	// SkipPermissions is true if the instance should run Claude with --dangerously-skip-permissions.
+	SkipPermissions bool
+	// TopicName is the name of the topic this instance belongs to (empty = ungrouped).
+	TopicName string
 	// Prompt is the initial prompt to pass to the instance on startup
 	Prompt string
+
+	// sharedWorktree is true if this instance uses a topic's shared worktree (should not clean it up).
+	sharedWorktree bool
+	// LoadingStage tracks the current startup progress. Exported so the UI can read it.
+	LoadingStage int
+	// LoadingTotal is the total number of startup stages.
+	LoadingTotal int
+	// LoadingMessage describes the current loading step.
+	LoadingMessage string
 
 	// DiffStats stores the current git diff statistics
 	diffStats *git.DiffStats
@@ -75,8 +88,10 @@ func (i *Instance) ToInstanceData() InstanceData {
 		Width:     i.Width,
 		CreatedAt: i.CreatedAt,
 		UpdatedAt: time.Now(),
-		Program:   i.Program,
-		AutoYes:   i.AutoYes,
+		Program:         i.Program,
+		AutoYes:         i.AutoYes,
+		SkipPermissions: i.SkipPermissions,
+		TopicName:       i.TopicName,
 	}
 
 	// Only include worktree data if gitWorktree is initialized
@@ -113,7 +128,9 @@ func FromInstanceData(data InstanceData) (*Instance, error) {
 		Width:     data.Width,
 		CreatedAt: data.CreatedAt,
 		UpdatedAt: data.UpdatedAt,
-		Program:   data.Program,
+		Program:         data.Program,
+		SkipPermissions: data.SkipPermissions,
+		TopicName:       data.TopicName,
 		gitWorktree: git.NewGitWorktreeFromStorage(
 			data.Worktree.RepoPath,
 			data.Worktree.WorktreePath,
@@ -130,7 +147,7 @@ func FromInstanceData(data InstanceData) (*Instance, error) {
 
 	if instance.Paused() {
 		instance.started = true
-		instance.tmuxSession = tmux.NewTmuxSession(instance.Title, instance.Program)
+		instance.tmuxSession = tmux.NewTmuxSession(instance.Title, instance.Program, instance.SkipPermissions)
 	} else {
 		if err := instance.Start(false); err != nil {
 			return nil, err
@@ -150,6 +167,10 @@ type InstanceOptions struct {
 	Program string
 	// If AutoYes is true, then
 	AutoYes bool
+	// SkipPermissions enables --dangerously-skip-permissions for Claude instances.
+	SkipPermissions bool
+	// TopicName assigns this instance to a topic.
+	TopicName string
 }
 
 func NewInstance(opts InstanceOptions) (*Instance, error) {
@@ -170,7 +191,9 @@ func NewInstance(opts InstanceOptions) (*Instance, error) {
 		Width:     0,
 		CreatedAt: t,
 		UpdatedAt: t,
-		AutoYes:   false,
+		AutoYes:         false,
+		SkipPermissions: opts.SkipPermissions,
+		TopicName:       opts.TopicName,
 	}, nil
 }
 
@@ -185,23 +208,44 @@ func (i *Instance) SetStatus(status Status) {
 	i.Status = status
 }
 
+func (i *Instance) setLoadingProgress(stage int, message string) {
+	i.LoadingStage = stage
+	i.LoadingMessage = message
+}
+
 // firstTimeSetup is true if this is a new instance. Otherwise, it's one loaded from storage.
 func (i *Instance) Start(firstTimeSetup bool) error {
 	if i.Title == "" {
 		return fmt.Errorf("instance title cannot be empty")
 	}
 
+	if firstTimeSetup {
+		i.LoadingTotal = 8
+	} else {
+		i.LoadingTotal = 6
+	}
+	i.LoadingStage = 0
+	i.LoadingMessage = "Initializing..."
+
+	i.setLoadingProgress(1, "Preparing session...")
 	var tmuxSession *tmux.TmuxSession
 	if i.tmuxSession != nil {
-		// Use existing tmux session (useful for testing)
 		tmuxSession = i.tmuxSession
 	} else {
-		// Create new tmux session
-		tmuxSession = tmux.NewTmuxSession(i.Title, i.Program)
+		tmuxSession = tmux.NewTmuxSession(i.Title, i.Program, i.SkipPermissions)
+	}
+	// Wire up tmux progress to instance loading progress
+	tmuxStageOffset := 3 // tmux stages start at 4 for first-time, 2 for reload
+	if !firstTimeSetup {
+		tmuxStageOffset = 1
+	}
+	tmuxSession.ProgressFunc = func(stage int, desc string) {
+		i.setLoadingProgress(tmuxStageOffset+stage, desc)
 	}
 	i.tmuxSession = tmuxSession
 
 	if firstTimeSetup {
+		i.setLoadingProgress(2, "Creating git worktree...")
 		gitWorktree, branchName, err := git.NewGitWorktree(i.Path, i.Title)
 		if err != nil {
 			return fmt.Errorf("failed to create git worktree: %w", err)
@@ -223,18 +267,21 @@ func (i *Instance) Start(firstTimeSetup bool) error {
 	}()
 
 	if !firstTimeSetup {
+		i.setLoadingProgress(2, "Restoring session...")
 		// Reuse existing session
 		if err := tmuxSession.Restore(); err != nil {
 			setupErr = fmt.Errorf("failed to restore existing session: %w", err)
 			return setupErr
 		}
 	} else {
+		i.setLoadingProgress(3, "Setting up git worktree...")
 		// Setup git worktree first
 		if err := i.gitWorktree.Setup(); err != nil {
 			setupErr = fmt.Errorf("failed to setup git worktree: %w", err)
 			return setupErr
 		}
 
+		i.setLoadingProgress(4, "Starting tmux session...")
 		// Create new session
 		if err := i.tmuxSession.Start(i.gitWorktree.GetWorktreePath()); err != nil {
 			// Cleanup git worktree if tmux session creation fails
@@ -248,6 +295,42 @@ func (i *Instance) Start(firstTimeSetup bool) error {
 
 	i.SetStatus(Running)
 
+	return nil
+}
+
+// StartInSharedWorktree starts the instance using a topic's shared worktree.
+// Unlike Start(), this does NOT create a new git worktree — it uses the one provided.
+func (i *Instance) StartInSharedWorktree(worktree *git.GitWorktree, branch string) error {
+	if i.Title == "" {
+		return fmt.Errorf("instance title cannot be empty")
+	}
+
+	i.LoadingTotal = 6
+	i.setLoadingProgress(1, "Connecting to shared worktree...")
+
+	i.gitWorktree = worktree
+	i.Branch = branch
+	i.sharedWorktree = true
+
+	var tmuxSession *tmux.TmuxSession
+	if i.tmuxSession != nil {
+		tmuxSession = i.tmuxSession
+	} else {
+		tmuxSession = tmux.NewTmuxSession(i.Title, i.Program, i.SkipPermissions)
+	}
+	tmuxSession.ProgressFunc = func(stage int, desc string) {
+		i.setLoadingProgress(1+stage, desc)
+	}
+	i.tmuxSession = tmuxSession
+
+	i.setLoadingProgress(2, "Starting tmux session...")
+
+	if err := i.tmuxSession.Start(worktree.GetWorktreePath()); err != nil {
+		return fmt.Errorf("failed to start session in shared worktree: %w", err)
+	}
+
+	i.started = true
+	i.SetStatus(Running)
 	return nil
 }
 
@@ -268,8 +351,8 @@ func (i *Instance) Kill() error {
 		}
 	}
 
-	// Then clean up git worktree
-	if i.gitWorktree != nil {
+	// Then clean up git worktree (skip if shared — topic owns the worktree)
+	if i.gitWorktree != nil && !i.sharedWorktree {
 		if err := i.gitWorktree.Cleanup(); err != nil {
 			errs = append(errs, fmt.Errorf("failed to cleanup git worktree: %w", err))
 		}
@@ -375,18 +458,20 @@ func (i *Instance) Pause() error {
 
 	var errs []error
 
-	// Check if there are any changes to commit
-	if dirty, err := i.gitWorktree.IsDirty(); err != nil {
-		errs = append(errs, fmt.Errorf("failed to check if worktree is dirty: %w", err))
-		log.ErrorLog.Print(err)
-	} else if dirty {
-		// Commit changes locally (without pushing to GitHub)
-		commitMsg := fmt.Sprintf("[claudesquad] update from '%s' on %s (paused)", i.Title, time.Now().Format(time.RFC822))
-		if err := i.gitWorktree.CommitChanges(commitMsg); err != nil {
-			errs = append(errs, fmt.Errorf("failed to commit changes: %w", err))
+	if !i.sharedWorktree {
+		// Check if there are any changes to commit
+		if dirty, err := i.gitWorktree.IsDirty(); err != nil {
+			errs = append(errs, fmt.Errorf("failed to check if worktree is dirty: %w", err))
 			log.ErrorLog.Print(err)
-			// Return early if we can't commit changes to avoid corrupted state
-			return i.combineErrors(errs)
+		} else if dirty {
+			// Commit changes locally (without pushing to GitHub)
+			commitMsg := fmt.Sprintf("[claudesquad] update from '%s' on %s (paused)", i.Title, time.Now().Format(time.RFC822))
+			if err := i.gitWorktree.CommitChanges(commitMsg); err != nil {
+				errs = append(errs, fmt.Errorf("failed to commit changes: %w", err))
+				log.ErrorLog.Print(err)
+				// Return early if we can't commit changes to avoid corrupted state
+				return i.combineErrors(errs)
+			}
 		}
 	}
 
@@ -397,20 +482,22 @@ func (i *Instance) Pause() error {
 		// Continue with pause process even if detach fails
 	}
 
-	// Check if worktree exists before trying to remove it
-	if _, err := os.Stat(i.gitWorktree.GetWorktreePath()); err == nil {
-		// Remove worktree but keep branch
-		if err := i.gitWorktree.Remove(); err != nil {
-			errs = append(errs, fmt.Errorf("failed to remove git worktree: %w", err))
-			log.ErrorLog.Print(err)
-			return i.combineErrors(errs)
-		}
+	if !i.sharedWorktree {
+		// Check if worktree exists before trying to remove it
+		if _, err := os.Stat(i.gitWorktree.GetWorktreePath()); err == nil {
+			// Remove worktree but keep branch
+			if err := i.gitWorktree.Remove(); err != nil {
+				errs = append(errs, fmt.Errorf("failed to remove git worktree: %w", err))
+				log.ErrorLog.Print(err)
+				return i.combineErrors(errs)
+			}
 
-		// Only prune if remove was successful
-		if err := i.gitWorktree.Prune(); err != nil {
-			errs = append(errs, fmt.Errorf("failed to prune git worktrees: %w", err))
-			log.ErrorLog.Print(err)
-			return i.combineErrors(errs)
+			// Only prune if remove was successful
+			if err := i.gitWorktree.Prune(); err != nil {
+				errs = append(errs, fmt.Errorf("failed to prune git worktrees: %w", err))
+				log.ErrorLog.Print(err)
+				return i.combineErrors(errs)
+			}
 		}
 	}
 
